@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/insights/2023-03-11/datacollectionrules"
 	sharedKeyWorkspaces "github.com/hashicorp/go-azure-sdk/resource-manager/operationalinsights/2020-08-01/workspaces"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/operationalinsights/2022-10-01/tables"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/operationalinsights/2022-10-01/workspaces"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
@@ -141,6 +142,12 @@ func resourceLogAnalyticsWorkspace() *pluginsdk.Resource {
 				Optional:     true,
 				Computed:     true,
 				ValidateFunc: validation.IntBetween(30, 730),
+			},
+
+			"tables": {
+				Type:     pluginsdk.TypeList,
+				Optional: true,
+				Computed: true,
 			},
 
 			"daily_quota_gb": {
@@ -551,6 +558,7 @@ func resourceLogAnalyticsWorkspaceUpdate(d *pluginsdk.ResourceData, meta interfa
 func resourceLogAnalyticsWorkspaceRead(d *pluginsdk.ResourceData, meta interface{}) error {
 	sharedKeyClient := meta.(*clients.Client).LogAnalytics.SharedKeyWorkspacesClient
 	client := meta.(*clients.Client).LogAnalytics.WorkspaceClient
+	tableClient := meta.(*clients.Client).LogAnalytics.TablesClient
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
@@ -603,6 +611,16 @@ func resourceLogAnalyticsWorkspaceRead(d *pluginsdk.ResourceData, meta interface
 				if capacityReservationLevel := sku.CapacityReservationLevel; capacityReservationLevel != nil {
 					d.Set("reservation_capacity_in_gb_per_day", int64(pointer.From(capacityReservationLevel)))
 				}
+			}
+
+			tables := tables.NewWorkspaceID(id.ID(), id.ResourceGroupName, id.WorkspaceName)
+			tableResp, err := tableClient.ListByWorkspace(ctx, id)
+			if err != nil {
+				return err
+			}
+			if tableModel := tableResp.Model, model != nil {
+        var tableNames []string
+				d.set("tables", tableModel.
 			}
 
 			d.Set("cmk_for_query_forced", pointer.From(props.ForceCmkForQuery))
